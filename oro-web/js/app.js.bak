@@ -1,0 +1,1171 @@
+// ==============================
+// Proyectos — Supabase
+// ==============================
+const projectCards = document.getElementById('project-cards');
+const projectStatus = document.getElementById('project-status');
+const projectModal = document.getElementById('project-modal');
+const projectModalClose = document.getElementById('project-modal-close');
+const projectModalTag = document.getElementById('project-modal-tag');
+const projectModalTitle = document.getElementById('project-modal-title');
+const projectModalDescription = document.getElementById('project-modal-description');
+const projectModalBudget = document.getElementById('project-modal-budget');
+const projectModalStart = document.getElementById('project-modal-start');
+const projectModalEnd = document.getElementById('project-modal-end');
+
+const projectStates = {
+  propuesto: { label: 'PROPUESTO', className: 'project-propuesto' },
+  evaluacion: { label: 'EN EVALUACIÓN', className: 'project-evaluacion' },
+  aprobado: { label: 'APROBADO', className: 'project-aprobado' },
+  ejecucion: { label: 'EN EJECUCIÓN', className: 'project-ejecucion' },
+  finalizado: { label: 'FINALIZADO', className: 'project-finalizado' }
+};
+
+function formatProjectDate(value) {
+  if (!value) return 'Sin definir';
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+function formatProjectMoney(value) {
+  if (value === null || value === undefined || value === '') return 'A definir';
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency', currency: 'ARS', maximumFractionDigits: 0
+  }).format(Number(value) || 0);
+}
+
+function getProjectState(estado) {
+  return projectStates[estado] || { label: 'PROYECTO', className: '' };
+}
+
+function crearTarjetaProyecto(item) {
+  const card = document.createElement('article');
+  card.className = 'card project-card';
+
+  const state = getProjectState(item.estado);
+  const tag = document.createElement('span');
+  tag.className = `tag project-tag ${state.className}`;
+  tag.textContent = state.label;
+
+  const title = document.createElement('h3');
+  title.textContent = item.titulo;
+
+  const desc = document.createElement('p');
+  desc.textContent = item.descripcion;
+
+  const budget = document.createElement('div');
+  budget.className = 'project-budget';
+  budget.innerHTML = '<span>Presupuesto</span>';
+  const amount = document.createElement('strong');
+  amount.textContent = formatProjectMoney(item.presupuesto);
+  budget.appendChild(amount);
+
+  const foot = document.createElement('div');
+  foot.className = 'card-foot project-foot';
+  foot.textContent = 'Ver proyecto →';
+
+  card.append(tag, title, desc, budget, foot);
+  card.addEventListener('click', () => abrirProyecto(item));
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+  card.setAttribute('aria-label', `Ver proyecto: ${item.titulo}`);
+  card.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      abrirProyecto(item);
+    }
+  });
+  return card;
+}
+
+function abrirProyecto(item) {
+  const state = getProjectState(item.estado);
+  projectModalTag.textContent = state.label;
+  projectModalTag.className = `tag project-tag ${state.className}`;
+  projectModalTitle.textContent = item.titulo;
+  projectModalDescription.textContent = item.descripcion;
+  projectModalBudget.textContent = formatProjectMoney(item.presupuesto);
+  projectModalStart.textContent = formatProjectDate(item.fecha_inicio);
+  projectModalEnd.textContent = formatProjectDate(item.fecha_fin);
+  projectModal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  projectModalClose.focus();
+}
+
+function cerrarProyecto() {
+  projectModal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+async function cargarProyectos() {
+  if (!supabaseClient || !projectCards) return;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('projects')
+      .select('id, titulo, descripcion, estado, presupuesto, fecha_inicio, fecha_fin, imagen')
+      .order('created_at', { ascending: false })
+      .limit(6);
+
+    if (error) throw error;
+
+    if (!data.length) {
+      projectCards.innerHTML = '<p class="empty-projects">No hay proyectos publicados por el momento.</p>';
+      projectStatus.textContent = 'Sin proyectos';
+      return;
+    }
+
+    projectCards.replaceChildren(...data.map(crearTarjetaProyecto));
+    projectStatus.textContent = `${data.length} proyecto${data.length === 1 ? '' : 's'}`;
+  } catch (error) {
+    console.error('Error cargando proyectos:', error);
+    projectCards.innerHTML = '<p class="empty-projects">No pudimos cargar los proyectos. Intentá nuevamente más tarde.</p>';
+    projectStatus.textContent = 'No disponible';
+  }
+}
+
+projectModalClose?.addEventListener('click', cerrarProyecto);
+projectModal?.querySelector('[data-close-project]')?.addEventListener('click', cerrarProyecto);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && projectModal && !projectModal.classList.contains('hidden')) cerrarProyecto();
+});
+
+cargarProyectos();
+
+// ==============================
+// Novedades — Supabase
+// ==============================
+const newsCards = document.getElementById('news-cards');
+const newsStatus = document.getElementById('news-status');
+const newsModal = document.getElementById('news-modal');
+const newsModalClose = document.getElementById('news-modal-close');
+const newsModalTag = document.getElementById('news-modal-tag');
+const newsModalTitle = document.getElementById('news-modal-title');
+const newsModalDate = document.getElementById('news-modal-date');
+const newsModalContent = document.getElementById('news-modal-content');
+
+function formatNewsDate(value) {
+  if (!value) return '';
+  return new Intl.DateTimeFormat('es-AR', {
+    day: '2-digit', month: 'short', year: 'numeric'
+  }).format(new Date(`${value}T00:00:00`));
+}
+
+function crearTarjetaNovedad(item) {
+  const card = document.createElement('article');
+  card.className = 'card news-card';
+
+  const tag = document.createElement('span');
+  tag.className = `tag${item.importante ? ' tag-important' : ''}`;
+  tag.textContent = item.importante ? 'IMPORTANTE' : 'NOVEDAD';
+
+  const title = document.createElement('h3');
+  title.textContent = item.titulo;
+
+  const desc = document.createElement('p');
+  desc.textContent = item.resumen || item.contenido;
+
+  const foot = document.createElement('div');
+  foot.className = 'card-foot';
+  foot.textContent = `${formatNewsDate(item.fecha)} · Ver novedad →`;
+
+  card.append(tag, title, desc, foot);
+  card.addEventListener('click', () => abrirNovedad(item));
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+  card.setAttribute('aria-label', `Ver novedad: ${item.titulo}`);
+  card.addEventListener('keydown', event => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      abrirNovedad(item);
+    }
+  });
+  return card;
+}
+
+function abrirNovedad(item) {
+  newsModalTag.textContent = item.importante ? 'IMPORTANTE' : 'NOVEDAD';
+  newsModalTag.className = `tag${item.importante ? ' tag-important' : ''}`;
+  newsModalTitle.textContent = item.titulo;
+  newsModalDate.textContent = formatNewsDate(item.fecha);
+  newsModalContent.textContent = item.contenido;
+  newsModal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  newsModalClose.focus();
+}
+
+function cerrarNovedad() {
+  newsModal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+async function cargarNovedades() {
+  if (!supabaseClient || !newsCards) return;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('news')
+      .select('id, titulo, resumen, contenido, imagen, fecha, importante')
+      .order('importante', { ascending: false })
+      .order('fecha', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(6);
+
+    if (error) throw error;
+
+    if (!data.length) {
+      newsCards.innerHTML = '<p class="empty-news">No hay novedades publicadas por el momento.</p>';
+      newsStatus.textContent = 'Sin publicaciones';
+      return;
+    }
+
+    newsCards.replaceChildren(...data.map(crearTarjetaNovedad));
+    newsStatus.textContent = `${data.length} publicación${data.length === 1 ? '' : 'es'}`;
+  } catch (error) {
+    console.error('Error cargando novedades:', error);
+    newsCards.innerHTML = '<p class="empty-news">No pudimos cargar las novedades. Intentá nuevamente más tarde.</p>';
+    newsStatus.textContent = 'No disponible';
+  }
+}
+
+newsModalClose?.addEventListener('click', cerrarNovedad);
+newsModal?.querySelector('[data-close-news]')?.addEventListener('click', cerrarNovedad);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && newsModal && !newsModal.classList.contains('hidden')) cerrarNovedad();
+});
+
+cargarNovedades();
+document.getElementById('year').textContent = new Date().getFullYear();
+
+const toggle = document.querySelector('.menu-toggle');
+const links = document.querySelector('.nav-links');
+toggle.addEventListener('click', () => {
+  const open = links.classList.toggle('open');
+  toggle.setAttribute('aria-expanded', String(open));
+  toggle.setAttribute('aria-label', open ? 'Cerrar menú' : 'Abrir menú');
+});
+links.querySelectorAll('a').forEach(link => link.addEventListener('click', () => {
+  links.classList.remove('open');
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-label', 'Abrir menú');
+}));
+
+// ==============================
+// Mi unidad — Supabase Auth
+// ==============================
+const loginForm = document.getElementById('login-form');
+const loginMessage = document.getElementById('login-message');
+const unitLogin = document.getElementById('unit-login');
+const unitPanel = document.getElementById('unit-panel');
+const panelUnit = document.getElementById('panel-unit');
+const panelName = document.getElementById('panel-name');
+const logoutBtn = document.getElementById('logout-btn');
+const passwordToggle = document.getElementById('password-toggle');
+const passwordInput = document.getElementById('unit-password');
+const emailInput = document.getElementById('unit-email');
+const suggestionForm = document.getElementById('suggestion-form');
+const suggestionType = document.getElementById('suggestion-type');
+const suggestionSubject = document.getElementById('suggestion-subject');
+const suggestionText = document.getElementById('suggestion-message');
+const suggestionSubmit = document.getElementById('suggestion-submit');
+const suggestionStatus = document.getElementById('suggestion-message-status');
+const suggestionLoginState = document.getElementById('suggestion-login-state');
+const mySuggestions = document.getElementById('my-suggestions');
+
+function setLoginMessage(message, type = 'error') {
+  loginMessage.textContent = message;
+  loginMessage.className = `login-message ${type}`;
+}
+
+function setLoading(loading) {
+  const button = loginForm?.querySelector('.login-submit');
+  if (!button) return;
+  button.disabled = loading;
+  button.textContent = loading ? 'Ingresando…' : 'Ingresar →';
+}
+
+function formatMoney(value) {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0
+  }).format(Number(value) || 0);
+}
+
+function renderEmptyAccount() {
+  document.getElementById('balance').textContent = '$0';
+  document.querySelector('.balance-status').textContent = '🟢 Cuenta al día';
+  document.querySelector('.balance-status').className = 'balance-status paid';
+}
+
+async function cargarEstadoCuenta(unitId) {
+  const { data: accounts, error } = await supabaseClient
+    .from('accounts')
+    .select('id, concepto, periodo, monto, vencimiento, estado, fecha_pago, archivo_path')
+    .eq('unit_id', unitId)
+    .order('vencimiento', { ascending: false });
+
+  if (error) throw error;
+
+  const pendientes = accounts.filter(a => a.estado !== 'pagado');
+  const pagados = accounts.filter(a => a.estado === 'pagado');
+  const saldo = pendientes.reduce((total, item) => total + Number(item.monto || 0), 0);
+
+  document.getElementById('balance').textContent = formatMoney(saldo);
+  const status = document.querySelector('.balance-status');
+  status.textContent = pendientes.length
+    ? `🔴 ${pendientes.length} período${pendientes.length === 1 ? '' : 's'} pendiente${pendientes.length === 1 ? '' : 's'}`
+    : '🟢 Cuenta al día';
+  status.className = `balance-status ${pendientes.length ? 'overdue' : 'paid'}`;
+
+  document.querySelector('.mini-stat:nth-child(2) strong').textContent = pagados.length;
+  document.querySelector('.mini-stat:nth-child(3) strong').textContent = pendientes.length;
+
+  const upcomingCard = document.querySelector('.panel-card:first-child');
+  const paymentsCard = document.querySelector('.panel-card:last-child');
+
+  const renderMovements = (card, rows, emptyText, limit = 4) => {
+    const target = card.querySelector('#recent-movements');
+    if (target) {
+      target.replaceChildren();
+    } else {
+      const title = card.querySelector('.panel-card-title');
+      [...card.children].forEach(child => { if (child !== title) child.remove(); });
+    }
+    const container = target || card;
+    if (!rows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'empty-state';
+      empty.textContent = emptyText;
+      container.appendChild(empty);
+      return;
+    }
+    rows.slice(0, limit).forEach(item => {
+      const movement = document.createElement('div');
+      movement.className = 'movement';
+      const info = document.createElement('div');
+      const strong = document.createElement('strong');
+      strong.textContent = item.periodo;
+      const small = document.createElement('small');
+      small.textContent = `${item.concepto} · Vencimiento ${new Date(`${item.vencimiento}T00:00:00`).toLocaleDateString('es-AR')}`;
+      info.append(strong, small);
+      const amount = document.createElement('b');
+      amount.textContent = formatMoney(item.monto);
+      const state = document.createElement('span');
+      state.className = `movement-status ${item.estado === 'pagado' ? 'paid' : 'pending'}`;
+      state.textContent = item.estado === 'pagado' ? 'Pagado' : item.estado === 'vencido' ? 'Vencido' : 'Pendiente';
+      movement.append(info, amount, state);
+      if (item.archivo_path) {
+        const actions = document.createElement('div');
+        actions.className = 'movement-document-actions';
+        const view = document.createElement('button');
+        view.type = 'button';
+        view.className = 'document-link';
+        view.textContent = '📄 Ver expensa';
+        view.addEventListener('click', () => abrirExpensa(item.archivo_path, item.periodo));
+        const download = document.createElement('button');
+        download.type = 'button';
+        download.className = 'document-link';
+        download.textContent = '⬇️ Descargar PDF';
+        download.addEventListener('click', () => descargarExpensa(item.archivo_path, item.periodo));
+        actions.append(view, download);
+        movement.appendChild(actions);
+      }
+      container.appendChild(movement);
+    });
+  };
+
+  renderMovements(upcomingCard, pendientes, 'No hay vencimientos pendientes.');
+  const recent = [...accounts].sort((a,b) => String(b.vencimiento || '').localeCompare(String(a.vencimiento || '')));
+  renderMovements(paymentsCard, recent, 'Todavía no hay movimientos registrados.', 6);
+  prepararHistorialCuenta(accounts);
+
+  if (!accounts.length) renderEmptyAccount();
+}
+
+function prepararHistorialCuenta(accounts) {
+  const yearSelect = document.getElementById('history-year');
+  const stateSelect = document.getElementById('history-state');
+  const list = document.getElementById('history-list');
+  const open = document.getElementById('open-history-btn');
+  const panel = document.getElementById('history-panel');
+  const close = document.getElementById('close-history-btn');
+  if (!yearSelect || !stateSelect || !list || !open || !panel) return;
+
+  const years = [...new Set(accounts.map(a => String(a.vencimiento || '').slice(0,4)).filter(Boolean))].sort((a,b)=>b.localeCompare(a));
+  const currentYear = yearSelect.value;
+  yearSelect.replaceChildren(new Option('Todos', ''));
+  years.forEach(year => yearSelect.appendChild(new Option(year, year)));
+  yearSelect.value = years.includes(currentYear) ? currentYear : '';
+
+  const render = () => {
+    const year = yearSelect.value;
+    const state = stateSelect.value;
+    const rows = accounts.filter(a => (!year || String(a.vencimiento || '').startsWith(year)) && (!state || a.estado === state));
+    list.replaceChildren();
+    if (!rows.length) {
+      list.innerHTML = '<p class="empty-state">No hay movimientos para esos filtros.</p>';
+      return;
+    }
+    rows.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'history-row';
+      row.innerHTML = `<div><strong>${escapeHtml(item.periodo)}</strong><small>${escapeHtml(item.concepto)} · Vencimiento ${new Date(`${item.vencimiento}T00:00:00`).toLocaleDateString('es-AR')}</small></div><b>${formatMoney(item.monto)}</b><span class="movement-status ${item.estado === 'pagado' ? 'paid' : item.estado === 'vencido' ? 'pending' : 'upcoming'}">${item.estado === 'pagado' ? 'Pagado' : item.estado === 'vencido' ? 'Vencido' : 'Pendiente'}</span>${item.archivo_path ? `<div class="history-doc-actions"><button type="button" class="document-link" data-history-view="${item.id}">📄 Ver</button><button type="button" class="document-link" data-history-download="${item.id}">⬇️ Descargar</button></div>` : ''}`;
+      list.appendChild(row);
+    });
+    list.querySelectorAll('[data-history-view]').forEach(btn => btn.addEventListener('click', () => { const item = accounts.find(a => String(a.id) === String(btn.dataset.historyView)); if (item) abrirExpensa(item.archivo_path, item.periodo); }));
+    list.querySelectorAll('[data-history-download]').forEach(btn => btn.addEventListener('click', () => { const item = accounts.find(a => String(a.id) === String(btn.dataset.historyDownload)); if (item) descargarExpensa(item.archivo_path, item.periodo); }));
+  };
+
+  open.onclick = () => { panel.classList.remove('hidden'); render(); open.classList.add('hidden'); };
+  close && (close.onclick = () => { panel.classList.add('hidden'); open.classList.remove('hidden'); });
+  yearSelect.onchange = render;
+  stateSelect.onchange = render;
+  if (!panel.classList.contains('hidden')) render();
+}
+
+async function obtenerUrlExpensa(path, periodo, download = false) {
+  if (!path) throw new Error('Esta expensa no tiene un PDF asociado.');
+  const safePeriodo = String(periodo || 'expensa').replace(/[^a-z0-9áéíóúüñ _-]/gi, '').trim() || 'expensa';
+  const filename = `Expensa_${safePeriodo.replace(/\s+/g, '_')}.pdf`;
+  const { data, error } = await supabaseClient.storage.from('expensas').createSignedUrl(path, 300, download ? { download: filename } : {});
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+async function abrirExpensa(path, periodo) {
+  try {
+    const url = await obtenerUrlExpensa(path, periodo, false);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } catch (error) {
+    alert(`No se pudo abrir la expensa: ${error.message}`);
+  }
+}
+
+async function descargarExpensa(path, periodo) {
+  try {
+    const url = await obtenerUrlExpensa(path, periodo, true);
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (error) {
+    alert(`No se pudo descargar la expensa: ${error.message}`);
+  }
+}
+
+async function cargarPerfil(user) {
+  const { data: profile, error } = await supabaseClient
+    .from('profiles')
+    .select('unit_id, nombre, rol')
+    .eq('id', user.id)
+    .single();
+
+  if (error) throw error;
+  if (!profile) throw new Error('No encontramos un perfil asociado a tu usuario.');
+
+  if (profile.rol === 'admin') {
+    await inicializarPanelAdmin(user, profile);
+    return;
+  }
+
+  if (!profile.unit_id) throw new Error('Tu usuario no tiene una unidad asociada.');
+
+  const { data: unit, error: unitError } = await supabaseClient
+    .from('units')
+    .select('id, numero')
+    .eq('id', profile.unit_id)
+    .single();
+
+  if (unitError) throw unitError;
+
+  setAdminVisible(false);
+  panelUnit.textContent = String(unit.numero).padStart(2, '0');
+  panelName.textContent = profile.nombre || 'vecino';
+  await cargarEstadoCuenta(unit.id);
+  await cargarMisSugerencias(unit.id);
+  setSuggestionFormEnabled(true);
+
+  unitLogin.classList.add('hidden');
+  unitPanel.classList.remove('hidden');
+}
+
+function formatSuggestionDate(value) {
+  if (!value) return '';
+  return new Intl.DateTimeFormat('es-AR', { day:'2-digit', month:'short', year:'numeric' }).format(new Date(value));
+}
+
+const suggestionStateLabels = {
+  recibido: 'Recibido',
+  en_revision: 'En revisión',
+  en_proceso: 'En proceso',
+  resuelto: 'Resuelto'
+};
+
+function setSuggestionStatus(message, type = '') {
+  if (!suggestionStatus) return;
+  suggestionStatus.textContent = message;
+  suggestionStatus.className = `suggestion-message ${type}`.trim();
+}
+
+function renderSuggestions(items) {
+  if (!mySuggestions) return;
+  mySuggestions.replaceChildren();
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'empty-state';
+    empty.textContent = 'Todavía no enviaste sugerencias o reclamos.';
+    mySuggestions.appendChild(empty);
+    return;
+  }
+  items.forEach(item => {
+    const wrapper = document.createElement('article');
+    wrapper.className = 'suggestion-item';
+    const top = document.createElement('div');
+    top.className = 'suggestion-item-top';
+    const title = document.createElement('h5');
+    title.textContent = item.asunto;
+    const status = document.createElement('span');
+    status.className = `suggestion-status ${item.estado}`;
+    status.textContent = suggestionStateLabels[item.estado] || item.estado;
+    top.append(title, status);
+    const message = document.createElement('p');
+    message.textContent = item.mensaje;
+    const meta = document.createElement('div');
+    meta.className = 'suggestion-meta';
+    const type = document.createElement('span');
+    type.className = 'suggestion-date';
+    type.textContent = item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1).replace('_', ' ');
+    const date = document.createElement('span');
+    date.className = 'suggestion-date';
+    date.textContent = formatSuggestionDate(item.created_at);
+    meta.append(type, date);
+    wrapper.append(top, message, meta);
+    if (item.respuesta) {
+      const response = document.createElement('div');
+      response.className = 'suggestion-response';
+      const label = document.createElement('strong');
+      label.textContent = 'Respuesta de administración';
+      const text = document.createElement('span');
+      text.textContent = item.respuesta;
+      response.append(label, text);
+      wrapper.appendChild(response);
+    }
+    mySuggestions.appendChild(wrapper);
+  });
+}
+
+async function cargarMisSugerencias(unitId) {
+  if (!mySuggestions) return;
+  const { data, error } = await supabaseClient
+    .from('suggestions')
+    .select('id, tipo, asunto, mensaje, estado, respuesta, created_at')
+    .eq('unit_id', unitId)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  if (error) throw error;
+  renderSuggestions(data || []);
+}
+
+function setSuggestionFormEnabled(enabled) {
+  if (!suggestionForm) return;
+  [...suggestionForm.elements].forEach(element => { element.disabled = !enabled; });
+  if (suggestionLoginState) suggestionLoginState.textContent = enabled ? 'Listo para enviar' : 'Iniciá sesión para enviar';
+}
+
+async function enviarSugerencia(event) {
+  event.preventDefault();
+  setSuggestionStatus('');
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const user = sessionData.session?.user;
+  if (!user) {
+    setSuggestionStatus('Primero iniciá sesión en Mi Unidad.', 'error');
+    document.getElementById('acceso')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+
+  setSuggestionFormEnabled(false);
+  suggestionSubmit.textContent = 'Enviando…';
+
+  try {
+    const { data: profile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('unit_id')
+      .eq('id', user.id)
+      .single();
+    if (profileError) throw profileError;
+
+    const { error } = await supabaseClient.from('suggestions').insert({
+      unit_id: profile.unit_id,
+      tipo: suggestionType.value,
+      asunto: suggestionSubject.value.trim(),
+      mensaje: suggestionText.value.trim()
+    });
+    if (error) throw error;
+
+    suggestionForm.reset();
+    setSuggestionStatus('¡Enviado! Tu mensaje quedó registrado.', 'success');
+    await cargarMisSugerencias(profile.unit_id);
+  } catch (error) {
+    console.error('Error enviando sugerencia:', error);
+    setSuggestionStatus('No pudimos enviar el mensaje. Intentá nuevamente.', 'error');
+  } finally {
+    setSuggestionFormEnabled(true);
+    suggestionSubmit.textContent = 'Enviar sugerencia →';
+  }
+}
+
+if (suggestionForm) {
+  suggestionForm.addEventListener('submit', enviarSugerencia);
+  setSuggestionFormEnabled(false);
+}
+
+async function iniciarSesion() {
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+
+  if (!email || !password) {
+    setLoginMessage('Ingresá tu correo y contraseña.');
+    return;
+  }
+
+  setLoading(true);
+  setLoginMessage('');
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    setLoading(false);
+    setLoginMessage('No pudimos iniciar sesión. Revisá el correo y la contraseña.');
+    return;
+  }
+
+  try {
+    await cargarPerfil(data.user);
+    setLoginMessage('');
+    if (adminPanel && !adminPanel.classList.contains('hidden')) adminPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else unitPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch (error) {
+    await supabaseClient.auth.signOut();
+    setLoginMessage('Tu usuario existe, pero todavía no está correctamente asociado a una unidad.');
+    console.error(error);
+  } finally {
+    setLoading(false);
+  }
+}
+
+if (passwordToggle) {
+  passwordToggle.addEventListener('click', () => {
+    const visible = passwordInput.type === 'text';
+    passwordInput.type = visible ? 'password' : 'text';
+    passwordToggle.textContent = visible ? 'Ver' : 'Ocultar';
+    passwordToggle.setAttribute('aria-label', visible ? 'Mostrar contraseña' : 'Ocultar contraseña');
+  });
+}
+
+if (loginForm) loginForm.addEventListener('submit', event => {
+  event.preventDefault();
+  iniciarSesion();
+});
+
+if (logoutBtn) {
+  logoutBtn.addEventListener('click', async () => {
+    await supabaseClient.auth.signOut();
+    unitPanel.classList.add('hidden');
+    setAdminVisible(false);
+    unitLogin.classList.remove('hidden');
+    loginForm.reset();
+    passwordInput.type = 'password';
+    passwordToggle.textContent = 'Ver';
+    setLoginMessage('');
+    setSuggestionFormEnabled(false);
+    if (mySuggestions) mySuggestions.innerHTML = '<p class="empty-state">Iniciá sesión para consultar tus mensajes.</p>';
+    if (suggestionStatus) suggestionStatus.textContent = '';
+    emailInput.focus();
+  });
+}
+
+// Si ya existe una sesión, la recuperamos automáticamente.
+supabaseClient.auth.getSession().then(async ({ data }) => {
+  if (data.session) {
+    try {
+      await cargarPerfil(data.session.user);
+    } catch (error) {
+      console.error(error);
+      await supabaseClient.auth.signOut();
+    }
+  }
+});
+
+// ==============================
+// Panel de administración — Supabase
+// ==============================
+const adminPanel = document.getElementById('admin-panel');
+const adminUserName = document.getElementById('admin-user-name');
+const adminLogoutBtn = document.getElementById('admin-logout-btn');
+const adminViews = [...document.querySelectorAll('.admin-view')];
+const adminTabs = [...document.querySelectorAll('.admin-tab')];
+let adminUnits = [];
+let adminAccounts = [];
+let adminShowAllAccounts = false;
+let adminNews = [];
+let adminProjects = [];
+let adminSuggestions = [];
+
+const adminStateLabels = {
+  pendiente: 'Pendiente', pagado: 'Pagado', vencido: 'Vencido',
+  recibido: 'Recibido', en_revision: 'En revisión', en_proceso: 'En proceso', resuelto: 'Resuelto'
+};
+
+function setAdminVisible(visible) {
+  if (!adminPanel) return;
+  adminPanel.classList.toggle('hidden', !visible);
+  if (visible) adminPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function cerrarSesionAdmin() {
+  if (!adminLogoutBtn) return;
+
+  adminLogoutBtn.disabled = true;
+  adminLogoutBtn.textContent = 'Cerrando sesión…';
+
+  try {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error cerrando sesión de administración:', error);
+    adminLogoutBtn.disabled = false;
+    adminLogoutBtn.textContent = 'Cerrar sesión';
+    return;
+  }
+
+  setAdminVisible(false);
+  unitPanel?.classList.add('hidden');
+  unitLogin?.classList.remove('hidden');
+  loginForm?.reset();
+  passwordInput.type = 'password';
+  passwordToggle.textContent = 'Ver';
+  setLoginMessage('');
+  setSuggestionFormEnabled(false);
+  if (mySuggestions) mySuggestions.innerHTML = '<p class="empty-state">Iniciá sesión para consultar tus mensajes.</p>';
+  if (suggestionStatus) suggestionStatus.textContent = '';
+  adminLogoutBtn.disabled = false;
+  adminLogoutBtn.textContent = 'Cerrar sesión';
+  emailInput?.focus();
+}
+
+adminLogoutBtn?.addEventListener('click', cerrarSesionAdmin);
+
+function setAdminTab(name) {
+  adminTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.adminTab === name));
+  adminViews.forEach(view => view.classList.toggle('active', view.id === `admin-view-${name}`));
+}
+
+adminTabs.forEach(tab => tab.addEventListener('click', async () => {
+  const name = tab.dataset.adminTab;
+  setAdminTab(name);
+  if (name === 'accounts') await cargarAdminAccounts();
+  if (name === 'news') await cargarAdminNews();
+  if (name === 'projects') await cargarAdminProjects();
+  if (name === 'suggestions') await cargarAdminSuggestions();
+}));
+
+document.getElementById('admin-new-account')?.addEventListener('click', () => abrirAdminForm('account-form'));
+document.getElementById('admin-new-news')?.addEventListener('click', () => abrirAdminForm('news-form'));
+document.getElementById('admin-new-project')?.addEventListener('click', () => abrirAdminForm('project-form'));
+document.querySelectorAll('[data-admin-cancel]').forEach(button => button.addEventListener('click', () => cerrarAdminForm(button.dataset.adminCancel)));
+
+function abrirAdminForm(id) { document.getElementById(id)?.classList.remove('hidden'); }
+function cerrarAdminForm(id) {
+  const form = document.getElementById(id);
+  if (!form) return;
+  form.classList.add('hidden');
+  form.reset();
+  const hidden = form.querySelector('input[type="hidden"]');
+  if (hidden) hidden.value = '';
+  const status = form.querySelector('.admin-form-status');
+  if (status) status.textContent = '';
+}
+
+function adminStatusClass(value) {
+  return String(value || '').replace(/[^a-z_]/g, '');
+}
+
+function adminDate(value) {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(`${value}T00:00:00`));
+}
+
+async function cargarAdminUnits() {
+  const { data, error } = await supabaseClient.from('units').select('id, numero').order('numero');
+  if (error) throw error;
+  adminUnits = data || [];
+  const select = document.getElementById('account-unit');
+  if (select) select.replaceChildren(...adminUnits.map(unit => {
+    const option = document.createElement('option');
+    option.value = unit.id;
+    option.textContent = `Unidad ${unit.numero}`;
+    return option;
+  }));
+  document.getElementById('admin-stat-units').textContent = adminUnits.length;
+}
+
+function unidadNumero(id) {
+  const unit = adminUnits.find(item => String(item.id) === String(id));
+  return unit ? String(unit.numero).padStart(2, '0') : '—';
+}
+
+function poblarAdminAccountFilters() {
+  const unitFilter = document.getElementById('admin-filter-unit');
+  if (unitFilter) {
+    const current = unitFilter.value;
+    unitFilter.replaceChildren(new Option('Todas las unidades', ''));
+    adminUnits.forEach(unit => unitFilter.appendChild(new Option(`Unidad ${unit.numero}`, String(unit.id))));
+    unitFilter.value = current;
+  }
+
+  const periodFilter = document.getElementById('admin-filter-period');
+  if (periodFilter) {
+    const current = periodFilter.value;
+    const periods = [...new Set(adminAccounts.map(item => item.periodo).filter(Boolean))]
+      .sort((a, b) => String(b).localeCompare(String(a), 'es', { numeric: true }));
+    periodFilter.replaceChildren(new Option('Todos los períodos', ''));
+    periods.forEach(period => periodFilter.appendChild(new Option(period, period)));
+    periodFilter.value = periods.includes(current) ? current : '';
+  }
+}
+
+function obtenerAdminAccountsFiltradas() {
+  const unit = document.getElementById('admin-filter-unit')?.value || '';
+  const period = document.getElementById('admin-filter-period')?.value || '';
+  const state = document.getElementById('admin-filter-state')?.value || '';
+  const search = (document.getElementById('admin-filter-search')?.value || '').trim().toLowerCase();
+
+  return adminAccounts.filter(item => {
+    if (unit && String(item.unit_id) !== String(unit)) return false;
+    if (period && String(item.periodo) !== period) return false;
+    if (state && item.estado !== state) return false;
+    if (search) {
+      const haystack = `${item.concepto || ''} ${item.periodo || ''} Unidad ${unidadNumero(item.unit_id)}`.toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function actualizarAdminAccountSummary(accounts = obtenerAdminAccountsFiltradas()) {
+  const pending = accounts.filter(a => a.estado === 'pendiente').reduce((sum, a) => sum + Number(a.monto || 0), 0);
+  const overdue = accounts.filter(a => a.estado === 'vencido').reduce((sum, a) => sum + Number(a.monto || 0), 0);
+  const paid = accounts.filter(a => a.estado === 'pagado').reduce((sum, a) => sum + Number(a.monto || 0), 0);
+  const debtUnits = new Set(accounts.filter(a => a.estado !== 'pagado').map(a => String(a.unit_id))).size;
+
+  const pendingEl = document.getElementById('admin-account-pending');
+  const overdueEl = document.getElementById('admin-account-overdue');
+  const paidEl = document.getElementById('admin-account-paid');
+  const debtUnitsEl = document.getElementById('admin-account-debt-units');
+  if (pendingEl) pendingEl.textContent = formatMoney(pending);
+  if (overdueEl) overdueEl.textContent = formatMoney(overdue);
+  if (paidEl) paidEl.textContent = formatMoney(paid);
+  if (debtUnitsEl) debtUnitsEl.textContent = String(debtUnits);
+}
+
+function renderAdminAccounts() {
+  const body = document.getElementById('admin-accounts-body');
+  if (!body) return;
+
+  const filtered = obtenerAdminAccountsFiltradas();
+  const visible = adminShowAllAccounts ? filtered : filtered.slice(0, 20);
+  body.replaceChildren();
+
+  let resultLabel = document.getElementById('admin-account-filter-result');
+  if (!resultLabel) {
+    resultLabel = document.createElement('p');
+    resultLabel.id = 'admin-account-filter-result';
+    resultLabel.className = 'admin-filter-result';
+    body.closest('.admin-table-wrap')?.before(resultLabel);
+  }
+  resultLabel.textContent = adminShowAllAccounts
+    ? `Mostrando ${filtered.length} de ${adminAccounts.length} cuenta${adminAccounts.length === 1 ? '' : 's'}.`
+    : `Mostrando las primeras ${Math.min(20, filtered.length)} de ${filtered.length} cuenta${filtered.length === 1 ? '' : 's'}.`; 
+
+  if (!filtered.length) {
+    body.innerHTML = '<tr><td colspan="8" class="admin-empty">No hay cuentas que coincidan con los filtros.</td></tr>';
+    actualizarAdminAccountSummary(filtered);
+    return;
+  }
+
+  visible.forEach(item => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><strong>Unidad ${unidadNumero(item.unit_id)}</strong></td><td>${escapeHtml(item.concepto)}</td><td>${escapeHtml(item.periodo)}</td><td>${adminDate(item.vencimiento)}</td><td>${formatMoney(item.monto)}</td><td><span class="admin-status ${adminStatusClass(item.estado)}">${adminStateLabels[item.estado] || item.estado}</span></td><td>${item.archivo_path ? `<button type="button" class="document-link" data-view-admin-pdf="${item.id}">📄 Ver PDF</button>` : '<span class="admin-file-none">Sin PDF</span>'}</td><td class="admin-actions"><button type="button" data-edit-account="${item.id}">Editar</button><button type="button" data-delete-account="${item.id}" class="danger">Eliminar</button></td>`;
+    body.appendChild(tr);
+  });
+
+  body.querySelectorAll('[data-edit-account]').forEach(btn => btn.addEventListener('click', () => editarAdminAccount(btn.dataset.editAccount)));
+  body.querySelectorAll('[data-delete-account]').forEach(btn => btn.addEventListener('click', () => eliminarAdminAccount(btn.dataset.deleteAccount)));
+  body.querySelectorAll('[data-view-admin-pdf]').forEach(btn => btn.addEventListener('click', () => {
+    const item = adminAccounts.find(row => String(row.id) === String(btn.dataset.viewAdminPdf));
+    if (item) abrirExpensa(item.archivo_path, item.periodo);
+  }));
+
+  actualizarAdminAccountSummary(filtered);
+}
+
+async function repararRutasAdminExpensas(accounts) {
+  const bucket = supabaseClient.storage.from('expensas');
+  const repaired = [];
+
+  for (const item of accounts || []) {
+    if (!item.archivo_path || !item.unit_id || !item.id) continue;
+
+    // La ruta correcta es siempre unidad/id.pdf.
+    const oldPath = String(item.archivo_path).replace(/^expensas\//, '').replace(/^\//, '');
+    const expectedPath = `${item.unit_id}/${item.id}.pdf`;
+    if (oldPath === expectedPath) continue;
+
+    // Solo intentamos migrar si el objeto antiguo realmente existe.
+    const { data: oldObject, error: oldError } = await bucket.list(oldPath.split('/').slice(0, -1).join('/'), {
+      search: oldPath.split('/').pop(),
+      limit: 20
+    });
+    const oldExists = !oldError && (oldObject || []).some(obj => `${oldPath.split('/').slice(0, -1).join('/')}/${obj.name}` === oldPath);
+    if (!oldExists) continue;
+
+    const { data: moveData, error: moveError } = await bucket.move(oldPath, expectedPath);
+    if (moveError) {
+      console.warn('No se pudo migrar el PDF de la cuenta', item.id, moveError);
+      continue;
+    }
+
+    const { error: updateError } = await supabaseClient
+      .from('accounts')
+      .update({ archivo_path: expectedPath })
+      .eq('id', item.id);
+
+    if (!updateError) {
+      item.archivo_path = expectedPath;
+      repaired.push(item.id);
+    } else {
+      console.warn('El PDF se movió pero no se pudo actualizar accounts', item.id, updateError);
+    }
+  }
+
+  if (repaired.length) {
+    console.info(`Se corrigieron ${repaired.length} ruta(s) de PDF.`);
+  }
+}
+
+async function cargarAdminAccounts() {
+  const body = document.getElementById('admin-accounts-body');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="8" class="admin-loading">Cargando cuentas…</td></tr>';
+  const { data, error } = await supabaseClient.from('accounts').select('id, unit_id, concepto, periodo, monto, vencimiento, estado, fecha_pago, archivo_path').order('vencimiento', { ascending: false });
+  if (error) {
+    body.innerHTML = `<tr><td colspan="8" class="admin-error">${escapeHtml(error.message)}</td></tr>`;
+    return;
+  }
+  adminAccounts = data || [];
+  await repararRutasAdminExpensas(adminAccounts);
+  adminShowAllAccounts = false;
+  const historyBtn = document.getElementById('admin-history-toggle');
+  if (historyBtn) historyBtn.textContent = '📋 Ver historial completo';
+  poblarAdminAccountFilters();
+  renderAdminAccounts();
+  actualizarAdminStats();
+}
+
+function aplicarAdminAccountFilters() {
+  renderAdminAccounts();
+}
+
+document.getElementById('admin-filter-unit')?.addEventListener('change', aplicarAdminAccountFilters);
+document.getElementById('admin-filter-period')?.addEventListener('change', aplicarAdminAccountFilters);
+document.getElementById('admin-filter-state')?.addEventListener('change', aplicarAdminAccountFilters);
+document.getElementById('admin-filter-search')?.addEventListener('input', aplicarAdminAccountFilters);
+document.getElementById('admin-filter-clear')?.addEventListener('click', () => {
+  const unit = document.getElementById('admin-filter-unit');
+  const period = document.getElementById('admin-filter-period');
+  const state = document.getElementById('admin-filter-state');
+  const search = document.getElementById('admin-filter-search');
+  if (unit) unit.value = '';
+  if (period) period.value = '';
+  if (state) state.value = '';
+  if (search) search.value = '';
+  renderAdminAccounts();
+});
+
+document.getElementById('admin-history-toggle')?.addEventListener('click', () => {
+  adminShowAllAccounts = !adminShowAllAccounts;
+  const btn = document.getElementById('admin-history-toggle');
+  if (btn) btn.textContent = adminShowAllAccounts ? '↩ Mostrar movimientos recientes' : '📋 Ver historial completo';
+  renderAdminAccounts();
+});
+
+function editarAdminAccount(id) {
+  const item = adminAccounts.find(row => String(row.id) === String(id));
+  if (!item) return;
+  abrirAdminForm('account-form');
+  document.getElementById('account-id').value = item.id;
+  document.getElementById('account-unit').value = item.unit_id;
+  document.getElementById('account-concept').value = item.concepto;
+  document.getElementById('account-period').value = item.periodo;
+  document.getElementById('account-amount').value = item.monto;
+  document.getElementById('account-due').value = item.vencimiento || '';
+  document.getElementById('account-state').value = item.estado;
+  document.getElementById('account-paid').value = item.fecha_pago || '';
+  document.getElementById('account-pdf').value = '';
+  document.getElementById('account-pdf-current').textContent = item.archivo_path ? 'Ya hay un PDF cargado. Seleccioná otro para reemplazarlo.' : 'Opcional · PDF máximo 10 MB.';
+  document.getElementById('account-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function eliminarAdminAccount(id) {
+  if (!confirm('¿Eliminar esta cuenta? Esta acción no se puede deshacer.')) return;
+  const item = adminAccounts.find(row => String(row.id) === String(id));
+  if (item?.archivo_path) await supabaseClient.storage.from('expensas').remove([item.archivo_path]);
+  const { error } = await supabaseClient.from('accounts').delete().eq('id', id);
+  if (error) return alert(`No se pudo eliminar: ${error.message}`);
+  await cargarAdminAccounts();
+}
+
+document.getElementById('account-form')?.addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const status = document.getElementById('account-form-status');
+  const fileInput = document.getElementById('account-pdf');
+  const file = fileInput?.files?.[0] || null;
+  status.textContent = 'Guardando…';
+  const id = document.getElementById('account-id').value;
+  const existing = id ? adminAccounts.find(row => String(row.id) === String(id)) : null;
+  if (file && (file.type !== 'application/pdf' || file.size > 10 * 1024 * 1024)) {
+    status.textContent = 'El archivo debe ser PDF y pesar hasta 10 MB.';
+    return;
+  }
+  const unitId = Number(document.getElementById('account-unit').value);
+  const payload = {
+    unit_id: unitId,
+    concepto: document.getElementById('account-concept').value.trim(),
+    periodo: document.getElementById('account-period').value.trim(),
+    monto: Number(document.getElementById('account-amount').value),
+    vencimiento: document.getElementById('account-due').value,
+    estado: document.getElementById('account-state').value,
+    fecha_pago: document.getElementById('account-paid').value || null
+  };
+  if (payload.estado === 'pagado' && !payload.fecha_pago) payload.fecha_pago = new Date().toISOString().slice(0,10);
+  try {
+    let result;
+    if (id) result = await supabaseClient.from('accounts').update(payload).eq('id', id).select('id').single();
+    else result = await supabaseClient.from('accounts').insert(payload).select('id').single();
+    if (result.error) throw result.error;
+    const accountId = result.data.id;
+    let archivoPath = existing?.archivo_path || null;
+    if (file) {
+      const newPath = `${unitId}/${accountId}.pdf`;
+      if (archivoPath && archivoPath !== newPath) await supabaseClient.storage.from('expensas').remove([archivoPath]);
+      const upload = await supabaseClient.storage.from('expensas').upload(newPath, file, { upsert: true, contentType: 'application/pdf' });
+      if (upload.error) throw upload.error;
+      archivoPath = newPath;
+      const updateFile = await supabaseClient.from('accounts').update({ archivo_path: archivoPath }).eq('id', accountId);
+      if (updateFile.error) throw updateFile.error;
+    }
+    status.textContent = 'Guardado correctamente.';
+    await cargarAdminAccounts();
+    setTimeout(() => cerrarAdminForm('account-form'), 500);
+  } catch (error) {
+    status.textContent = `Error: ${error.message}`;
+  }
+});
+
+async function cargarAdminNews() {
+  const list = document.getElementById('admin-news-list');
+  if (!list) return;
+  list.innerHTML = '<p class="admin-loading">Cargando novedades…</p>';
+  const { data, error } = await supabaseClient.from('news').select('id, titulo, resumen, contenido, fecha, importante').order('fecha', { ascending: false }).order('id', { ascending: false });
+  if (error) { list.innerHTML = `<p class="admin-error">${escapeHtml(error.message)}</p>`; return; }
+  adminNews = data || [];
+  list.replaceChildren();
+  if (!adminNews.length) { list.innerHTML = '<p class="admin-empty">No hay novedades publicadas.</p>'; return; }
+  adminNews.forEach(item => {
+    const card = document.createElement('article'); card.className = 'admin-list-item';
+    card.innerHTML = `<div><span class="admin-list-meta">${adminDate(item.fecha)}${item.importante ? ' · IMPORTANTE' : ''}</span><h4>${escapeHtml(item.titulo)}</h4><p>${escapeHtml(item.resumen || item.contenido)}</p></div><div class="admin-actions"><button type="button" data-edit-news="${item.id}">Editar</button><button type="button" data-delete-news="${item.id}" class="danger">Eliminar</button></div>`;
+    list.appendChild(card);
+  });
+  list.querySelectorAll('[data-edit-news]').forEach(btn => btn.addEventListener('click', () => editarAdminNews(btn.dataset.editNews)));
+  list.querySelectorAll('[data-delete-news]').forEach(btn => btn.addEventListener('click', () => eliminarAdminNews(btn.dataset.deleteNews)));
+}
+
+function editarAdminNews(id) {
+  const item = adminNews.find(row => String(row.id) === String(id)); if (!item) return;
+  abrirAdminForm('news-form');
+  document.getElementById('news-id').value = item.id;
+  document.getElementById('news-title').value = item.titulo;
+  document.getElementById('news-date').value = item.fecha || '';
+  document.getElementById('news-summary').value = item.resumen || '';
+  document.getElementById('news-content-admin').value = item.contenido || '';
+  document.getElementById('news-important').checked = !!item.importante;
+  document.getElementById('news-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function eliminarAdminNews(id) {
+  if (!confirm('¿Eliminar esta novedad?')) return;
+  const { error } = await supabaseClient.from('news').delete().eq('id', id);
+  if (error) return alert(`No se pudo eliminar: ${error.message}`);
+  await cargarAdminNews(); await cargarNovedades();
+}
+
+document.getElementById('news-form')?.addEventListener('submit', async event => {
+  event.preventDefault(); const status = document.getElementById('news-form-status'); status.textContent = 'Guardando…';
+  const id = document.getElementById('news-id').value;
+  const payload = { titulo: document.getElementById('news-title').value.trim(), resumen: document.getElementById('news-summary').value.trim() || null, contenido: document.getElementById('news-content-admin').value.trim(), fecha: document.getElementById('news-date').value, importante: document.getElementById('news-important').checked };
+  try { const result = id ? await supabaseClient.from('news').update(payload).eq('id', id) : await supabaseClient.from('news').insert(payload); if (result.error) throw result.error; status.textContent='Guardado correctamente.'; await cargarAdminNews(); await cargarNovedades(); setTimeout(()=>cerrarAdminForm('news-form'),400); } catch(error) { status.textContent=`Error: ${error.message}`; }
+});
+
+async function cargarAdminProjects() {
+  const list = document.getElementById('admin-project-list'); if (!list) return;
+  list.innerHTML='<p class="admin-loading">Cargando proyectos…</p>';
+  const { data, error } = await supabaseClient.from('projects').select('id, titulo, descripcion, estado, presupuesto, fecha_inicio, fecha_fin').order('created_at', { ascending:false });
+  if (error) { list.innerHTML=`<p class="admin-error">${escapeHtml(error.message)}</p>`; return; }
+  adminProjects=data||[]; list.replaceChildren();
+  if (!adminProjects.length) { list.innerHTML='<p class="admin-empty">No hay proyectos.</p>'; return; }
+  adminProjects.forEach(item=>{ const card=document.createElement('article'); card.className='admin-list-item'; card.innerHTML=`<div><span class="admin-list-meta">${adminStateLabels[item.estado]||item.estado}${item.presupuesto!=null?' · '+formatMoney(item.presupuesto):''}</span><h4>${escapeHtml(item.titulo)}</h4><p>${escapeHtml(item.descripcion)}</p></div><div class="admin-actions"><button type="button" data-edit-project="${item.id}">Editar</button><button type="button" data-delete-project="${item.id}" class="danger">Eliminar</button></div>`; list.appendChild(card); });
+  list.querySelectorAll('[data-edit-project]').forEach(btn=>btn.addEventListener('click',()=>editarAdminProject(btn.dataset.editProject)));
+  list.querySelectorAll('[data-delete-project]').forEach(btn=>btn.addEventListener('click',()=>eliminarAdminProject(btn.dataset.deleteProject)));
+  actualizarAdminStats();
+}
+
+function editarAdminProject(id) { const item=adminProjects.find(row=>String(row.id)===String(id)); if(!item)return; abrirAdminForm('project-form'); document.getElementById('project-id').value=item.id; document.getElementById('project-title').value=item.titulo; document.getElementById('project-state').value=item.estado; document.getElementById('project-description').value=item.descripcion; document.getElementById('project-budget').value=item.presupuesto ?? ''; document.getElementById('project-start').value=item.fecha_inicio||''; document.getElementById('project-end').value=item.fecha_fin||''; document.getElementById('project-form').scrollIntoView({behavior:'smooth',block:'center'}); }
+async function eliminarAdminProject(id) { if(!confirm('¿Eliminar este proyecto?'))return; const {error}=await supabaseClient.from('projects').delete().eq('id',id); if(error)return alert(`No se pudo eliminar: ${error.message}`); await cargarAdminProjects(); await cargarProyectos(); }
+
+document.getElementById('project-form')?.addEventListener('submit',async event=>{ event.preventDefault(); const status=document.getElementById('project-form-status'); status.textContent='Guardando…'; const id=document.getElementById('project-id').value; const budget=document.getElementById('project-budget').value; const payload={titulo:document.getElementById('project-title').value.trim(),descripcion:document.getElementById('project-description').value.trim(),estado:document.getElementById('project-state').value,presupuesto:budget===''?null:Number(budget),fecha_inicio:document.getElementById('project-start').value||null,fecha_fin:document.getElementById('project-end').value||null}; try{const result=id?await supabaseClient.from('projects').update(payload).eq('id',id):await supabaseClient.from('projects').insert(payload);if(result.error)throw result.error;status.textContent='Guardado correctamente.';await cargarAdminProjects();await cargarProyectos();setTimeout(()=>cerrarAdminForm('project-form'),400);}catch(error){status.textContent=`Error: ${error.message}`;} });
+
+async function cargarAdminSuggestions() {
+  const list=document.getElementById('admin-suggestions-list'); if(!list)return; list.innerHTML='<p class="admin-loading">Cargando mensajes…</p>';
+  const {data,error}=await supabaseClient.from('suggestions').select('id, unit_id, tipo, asunto, mensaje, estado, respuesta, created_at, updated_at').order('created_at',{ascending:false});
+  if(error){list.innerHTML=`<p class="admin-error">${escapeHtml(error.message)}</p>`;return;} adminSuggestions=data||[]; list.replaceChildren();
+  if(!adminSuggestions.length){list.innerHTML='<p class="admin-empty">No hay sugerencias ni reclamos.</p>';actualizarAdminStats();return;}
+  adminSuggestions.forEach(item=>{ const card=document.createElement('article'); card.className='admin-list-item admin-suggestion-item'; card.innerHTML=`<div><span class="admin-list-meta">Unidad ${unidadNumero(item.unit_id)} · ${item.tipo} · ${adminDate(item.created_at.slice(0,10))}</span><h4>${escapeHtml(item.asunto)} <span class="admin-status ${adminStatusClass(item.estado)}">${adminStateLabels[item.estado]||item.estado}</span></h4><p>${escapeHtml(item.mensaje)}</p>${item.respuesta?`<div class="admin-response"><strong>Respuesta:</strong> ${escapeHtml(item.respuesta)}</div>`:''}</div><div class="admin-suggestion-controls"><select data-suggestion-state="${item.id}"><option value="recibido">Recibido</option><option value="en_revision">En revisión</option><option value="en_proceso">En proceso</option><option value="resuelto">Resuelto</option></select><textarea data-suggestion-response="${item.id}" rows="3" placeholder="Respuesta al vecino…">${escapeHtml(item.respuesta||'')}</textarea><button class="btn btn-dark" type="button" data-save-suggestion="${item.id}">Guardar respuesta</button></div>`; list.appendChild(card); const select=card.querySelector(`[data-suggestion-state="${item.id}"]`); select.value=item.estado; });
+  list.querySelectorAll('[data-save-suggestion]').forEach(btn=>btn.addEventListener('click',()=>guardarAdminSuggestion(btn.dataset.saveSuggestion)));
+  actualizarAdminStats();
+}
+
+async function guardarAdminSuggestion(id){ const card=document.querySelector(`[data-save-suggestion="${id}"]`)?.closest('.admin-suggestion-item'); if(!card)return; const estado=card.querySelector(`[data-suggestion-state="${id}"]`).value; const respuesta=card.querySelector(`[data-suggestion-response="${id}"]`).value.trim()||null; const btn=card.querySelector('[data-save-suggestion]'); btn.disabled=true; btn.textContent='Guardando…'; const {error}=await supabaseClient.from('suggestions').update({estado,respuesta,updated_at:new Date().toISOString()}).eq('id',id); btn.disabled=false; btn.textContent='Guardar respuesta'; if(error)return alert(`No se pudo guardar: ${error.message}`); await cargarAdminSuggestions(); }
+
+async function actualizarAdminStats(){
+  const balance=adminAccounts.filter(a=>a.estado!=='pagado').reduce((sum,a)=>sum+Number(a.monto||0),0);
+  document.getElementById('admin-stat-balance').textContent=formatMoney(balance);
+  document.getElementById('admin-stat-suggestions').textContent=adminSuggestions.filter(s=>s.estado!=='resuelto').length;
+  document.getElementById('admin-stat-projects').textContent=adminProjects.filter(p=>['evaluacion','aprobado','ejecucion'].includes(p.estado)).length;
+}
+
+function escapeHtml(value){ const div=document.createElement('div'); div.textContent=value==null?'':String(value); return div.innerHTML; }
+
+async function inicializarPanelAdmin(user, profile) {
+  adminUserName.textContent = profile.nombre || 'Administración ORO';
+  setAdminVisible(true);
+  unitLogin.classList.add('hidden');
+  unitPanel.classList.add('hidden');
+  setSuggestionFormEnabled(false);
+  await cargarAdminUnits();
+  await Promise.all([cargarAdminAccounts(), cargarAdminNews(), cargarAdminProjects(), cargarAdminSuggestions()]);
+}

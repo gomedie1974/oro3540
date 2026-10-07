@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Portal de vecinos del barrio ORO">
+  <title>ORO | Portal de vecinos</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase.js" defer></script>
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <header class="header">
+    <nav class="nav container" aria-label="Navegación principal">
+      <a class="brand" href="#inicio" aria-label="ORO, inicio"><span class="brand-mark">O</span><span>ORO<small>PORTAL DE VECINOS</small></span></a>
+      <button class="menu-toggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="nav-links">☰</button>
+      <div class="nav-links" id="nav-links">
+        <a href="#novedades">Novedades</a><a href="#proyectos">Proyectos</a><a href="#participa">Participá</a><a class="btn btn-dark" href="#acceso">Mi unidad ↗</a>
+      </div>
+    </nav>
+  </header>
+  <main>
+    <section class="hero" id="inicio"><div class="container hero-inner"><span class="eyebrow">NUESTRO ESPACIO COMPARTIDO</span><h1>Todo ORO,<br><em>en un solo lugar.</em></h1><p>Novedades, proyectos y comunicación para las 19 unidades del barrio.</p><div class="hero-actions"><a class="btn btn-gold" href="#novedades">Ver novedades →</a><a class="btn btn-outline" href="#acceso">Acceder a mi unidad</a></div></div><div class="hero-decoration" aria-hidden="true">O</div></section>
+    <section class="container status-section" aria-label="Estado del barrio"><div class="status-card"><div><span class="eyebrow">INFORMACIÓN GENERAL</span><h2>Estado del barrio</h2><p>Los comunicados importantes aparecerán aquí cuando la administración los publique.</p></div><span class="status-label"><span class="status-dot"></span> Espacio de avisos</span></div></section>
+    <section class="section container" id="novedades"><div class="section-heading"><div><span class="eyebrow">MANTENETE AL DÍA</span><h2>Últimas novedades</h2></div><span class="demo-label" id="news-status">Cargando novedades…</span></div><div class="cards" id="news-cards"></div></section>
+    <section class="section projects-bg" id="proyectos"><div class="container"><div class="section-heading"><div><span class="eyebrow">CONSTRUIMOS ENTRE TODOS</span><h2>Proyectos del barrio</h2></div><span class="demo-label" id="project-status">Cargando proyectos…</span></div><div class="cards" id="project-cards"></div></div></section>
+    <section class="section container" id="participa">
+      <div class="participate-head">
+        <div><span class="eyebrow">TU VOZ IMPORTA</span><h2>Sugerencias y reclamos</h2><p>Contanos qué podemos mejorar. Tu mensaje queda registrado y después podés consultar su estado desde Mi Unidad.</p></div>
+        <span class="suggestion-login-state" id="suggestion-login-state">Iniciá sesión para enviar</span>
+      </div>
+      <div class="suggestion-layout">
+        <form class="suggestion-form" id="suggestion-form">
+          <div class="form-row">
+            <div><label for="suggestion-type">Tipo</label><select id="suggestion-type" required><option value="sugerencia">Sugerencia</option><option value="reclamo">Reclamo</option><option value="mantenimiento">Mantenimiento</option><option value="otro">Otro</option></select></div>
+            <div><label for="suggestion-subject">Asunto</label><input id="suggestion-subject" type="text" maxlength="120" placeholder="Ej.: Luminarias del sector común" required></div>
+          </div>
+          <div><label for="suggestion-message">Mensaje</label><textarea id="suggestion-message" rows="5" maxlength="2000" placeholder="Contanos qué sucede o qué proponés..." required></textarea></div>
+          <div class="suggestion-form-footer"><button class="btn btn-dark" type="submit" id="suggestion-submit">Enviar sugerencia →</button><span class="suggestion-message" id="suggestion-message-status" role="status"></span></div>
+        </form>
+      </div>
+    </section>
+    <section class="section container access" id="acceso">
+      <div class="section-heading access-heading">
+        <div><span class="eyebrow">ESPACIO PRIVADO</span><h2>Mi unidad</h2></div>
+        <span class="demo-label">Modo demostración</span>
+      </div>
+
+      <div class="unit-login" id="unit-login">
+        <div class="login-copy">
+          <span class="login-icon">O</span>
+          <h3>Accedé a la información de tu unidad</h3>
+          <p>Consultá el estado de cuenta, vencimientos y pagos realizados desde un único lugar.</p>
+        </div>
+        <form class="login-form" id="login-form">
+          <label for="unit-email">Correo electrónico</label>
+          <input id="unit-email" name="email" type="email" autocomplete="username" placeholder="tu correo electrónico" required>
+          <label for="unit-password">Contraseña</label>
+          <div class="password-field">
+            <input id="unit-password" name="password" type="password" placeholder="Ingresá tu contraseña" required>
+            <button type="button" class="password-toggle" id="password-toggle" aria-label="Mostrar contraseña">Ver</button>
+          </div>
+          <button class="btn btn-dark login-submit" type="submit">Ingresar →</button>
+          <p class="login-message" id="login-message" role="alert"></p>
+          <small class="demo-hint">Ingresá con el correo y la contraseña de tu cuenta de ORO.</small>
+        </form>
+      </div>
+
+      <div class="unit-panel hidden" id="unit-panel" aria-live="polite">
+        <div class="panel-top">
+          <div><span class="eyebrow">MI UNIDAD</span><h3>Hola, <span id="panel-name">vecino</span> 👋</h3><p>Unidad <strong id="panel-unit">--</strong> · Estado de cuenta actualizado.</p></div>
+          <button class="btn btn-outline-dark" id="logout-btn" type="button">Cerrar sesión</button>
+        </div>
+
+        <div class="account-summary">
+          <div class="balance-card"><span>Saldo pendiente</span><strong id="balance">$85.000</strong><small class="balance-status overdue">🔴 2 períodos pendientes</small></div>
+          <div class="mini-stat"><span>Pagados</span><strong>8</strong><small>períodos</small></div>
+          <div class="mini-stat"><span>Pendientes</span><strong>2</strong><small>períodos</small></div>
+        </div>
+
+        <div class="panel-grid">
+          <div class="panel-card"><div class="panel-card-title"><h4>Próximos vencimientos</h4><span>2026</span></div><div class="movement"><div><strong>Octubre</strong><small>Expensas · Vencimiento 10/10/26</small></div><b>$40.000</b><span class="movement-status pending">Pendiente</span></div><div class="movement"><div><strong>Noviembre</strong><small>Expensas · Vencimiento 10/11/26</small></div><b>$45.000</b><span class="movement-status upcoming">Próximo</span></div></div>
+          <div class="panel-card"><div class="panel-card-title"><h4>Últimos movimientos</h4><span>Últimos 6</span></div><div id="recent-movements"><div class="empty-state">Cargando movimientos…</div></div><button type="button" class="btn btn-light history-btn" id="open-history-btn">📋 Ver historial completo</button></div>
+        </div>
+
+        <div class="panel-card suggestions-panel">
+          <div class="panel-card-title"><h4>Mis sugerencias y reclamos</h4><span>Seguimiento</span></div>
+          <div id="my-suggestions" class="suggestions-list"><p class="empty-state">Iniciá sesión para consultar tus mensajes.</p></div>
+        </div>
+
+        <div class="history-panel hidden" id="history-panel">
+          <div class="history-header"><div><h4>Historial de cuenta</h4><p>Consultá todos los períodos de tu unidad.</p></div><button type="button" class="btn btn-light" id="close-history-btn">Cerrar</button></div>
+          <div class="history-filters"><label>Año<select id="history-year"><option value="">Todos</option></select></label><label>Estado<select id="history-state"><option value="">Todos</option><option value="pendiente">Pendiente</option><option value="pagado">Pagado</option><option value="vencido">Vencido</option></select></label></div>
+          <div id="history-list" class="history-list"></div>
+        </div>
+
+        <div class="panel-actions"><button type="button" class="btn btn-dark" onclick="document.getElementById('participa').scrollIntoView({behavior:'smooth'})">Nueva sugerencia</button><button type="button" class="btn btn-light">Documentación</button><button type="button" class="btn btn-light">Contactar administración</button></div>
+      </div>
+    </section>
+
+    <!-- ==============================
+         Panel de administración
+         ============================== -->
+    <section class="section container admin-panel hidden" id="admin-panel">
+      <div class="admin-hero">
+        <div>
+          <span class="eyebrow">ESPACIO DE ADMINISTRACIÓN</span>
+          <h2>Panel de administración</h2>
+          <p>Gestioná cuentas, novedades, proyectos y reclamos de las 19 unidades.</p>
+        </div>
+        <div class="admin-hero-actions">
+          <div class="admin-user-badge"><span class="admin-badge-dot"></span><span id="admin-user-name">Administración ORO</span></div>
+          <button class="btn btn-outline-dark" id="admin-logout-btn" type="button">Cerrar sesión</button>
+        </div>
+      </div>
+
+      <div class="admin-stats" id="admin-stats">
+        <article><span>Unidades</span><strong id="admin-stat-units">19</strong><small>unidades registradas</small></article>
+        <article><span>Saldo pendiente</span><strong id="admin-stat-balance">$0</strong><small>cuentas no pagadas</small></article>
+        <article><span>Reclamos abiertos</span><strong id="admin-stat-suggestions">0</strong><small>requieren seguimiento</small></article>
+        <article><span>Proyectos activos</span><strong id="admin-stat-projects">0</strong><small>en evaluación o ejecución</small></article>
+      </div>
+
+      <div class="admin-tabs" role="tablist" aria-label="Secciones de administración">
+        <button class="admin-tab active" data-admin-tab="accounts" type="button">💰 Cuentas</button>
+        <button class="admin-tab" data-admin-tab="news" type="button">📰 Novedades</button>
+        <button class="admin-tab" data-admin-tab="projects" type="button">🏗️ Proyectos</button>
+        <button class="admin-tab" data-admin-tab="suggestions" type="button">📩 Reclamos</button>
+        <button class="admin-tab" data-admin-tab="owners" type="button">👥 Propietarios</button>
+      </div>
+
+      <div class="admin-view" id="admin-view-owners">
+        <div class="admin-toolbar">
+          <div><h3>Propietarios</h3><p>Creá usuarios y asigná nombre, apellido y unidad desde este panel.</p></div>
+          <button class="btn btn-gold" type="button" id="admin-new-owner">+ Crear propietario</button>
+        </div>
+        <div class="admin-list" id="admin-profiles-list"></div>
+      </div>
+
+      <div class="admin-view active" id="admin-view-accounts">
+        <div class="admin-toolbar">
+          <div><h3>Estado de cuentas</h3><p>Cargá y actualizá movimientos de cada unidad.</p></div>
+          <button class="btn btn-gold" type="button" id="admin-new-account">+ Nueva cuenta</button>
+        </div>
+
+        <div class="admin-account-summary" id="admin-account-summary">
+          <article><span>Pendiente</span><strong id="admin-account-pending">$0</strong><small>Total pendiente</small></article>
+          <article><span>Vencido</span><strong id="admin-account-overdue">$0</strong><small>Total vencido</small></article>
+          <article><span>Pagado</span><strong id="admin-account-paid">$0</strong><small>Total pagado</small></article>
+          <article><span>Con deuda</span><strong id="admin-account-debt-units">0</strong><small>Unidades con deuda</small></article>
+        </div>
+
+        <div class="admin-account-filters" aria-label="Filtros de cuentas">
+          <div><label for="admin-filter-unit">Unidad</label><select id="admin-filter-unit"><option value="">Todas las unidades</option></select></div>
+          <div><label for="admin-filter-period">Período</label><select id="admin-filter-period"><option value="">Todos los períodos</option></select></div>
+          <div><label for="admin-filter-state">Estado</label><select id="admin-filter-state"><option value="">Todos los estados</option><option value="pendiente">Pendiente</option><option value="pagado">Pagado</option><option value="vencido">Vencido</option></select></div>
+          <div class="admin-filter-search"><label for="admin-filter-search">Buscar</label><input id="admin-filter-search" type="search" placeholder="Concepto o período…"></div>
+          <button class="btn btn-light admin-filter-clear" type="button" id="admin-filter-clear">Limpiar filtros</button>
+          <button class="btn btn-light" type="button" id="admin-history-toggle">📋 Ver historial completo</button>
+        </div>
+
+        <form class="admin-form hidden" id="account-form">
+          <input type="hidden" id="account-id">
+          <div class="admin-form-grid">
+            <div><label for="account-unit">Unidad</label><select id="account-unit" required></select></div>
+            <div><label for="account-concept">Concepto</label><input id="account-concept" maxlength="100" placeholder="Expensas" required></div>
+            <div><label for="account-period">Período</label><input id="account-period" maxlength="40" placeholder="Octubre 2026" required></div>
+            <div><label for="account-amount">Monto</label><input id="account-amount" type="number" min="0" step="0.01" required></div>
+            <div><label for="account-due">Vencimiento</label><input id="account-due" type="date" required></div>
+            <div><label for="account-state">Estado</label><select id="account-state"><option value="pendiente">Pendiente</option><option value="pagado">Pagado</option><option value="vencido">Vencido</option></select></div>
+            <div><label for="account-paid">Fecha de pago</label><input id="account-paid" type="date"></div>
+            <div class="admin-form-wide"><label for="account-pdf">PDF de la expensa</label><input id="account-pdf" type="file" accept="application/pdf"><small class="admin-file-hint" id="account-pdf-current">Opcional · PDF máximo 10 MB.</small></div>
+          </div>
+          <div class="admin-form-actions"><button class="btn btn-dark" type="submit">Guardar cuenta</button><button class="btn btn-light" type="button" data-admin-cancel="account-form">Cancelar</button><span class="admin-form-status" id="account-form-status"></span></div>
+        </form>
+        <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Unidad</th><th>Concepto</th><th>Período</th><th>Vencimiento</th><th>Monto</th><th>Estado</th><th>Documento</th><th></th></tr></thead><tbody id="admin-accounts-body"></tbody></table></div>
+      </div>
+
+      <div class="admin-view" id="admin-view-news">
+        <div class="admin-toolbar"><div><h3>Novedades</h3><p>Publicá comunicados para todo el barrio.</p></div><button class="btn btn-gold" type="button" id="admin-new-news">+ Nueva novedad</button></div>
+        <form class="admin-form hidden" id="news-form">
+          <input type="hidden" id="news-id">
+          <div class="admin-form-grid"><div><label for="news-title">Título</label><input id="news-title" maxlength="160" required></div><div><label for="news-date">Fecha</label><input id="news-date" type="date" required></div><div class="admin-form-wide"><label for="news-summary">Resumen</label><input id="news-summary" maxlength="240"></div><div class="admin-form-wide"><label for="news-content-admin">Contenido</label><textarea id="news-content-admin" rows="5" maxlength="5000" required></textarea></div><div><label><input id="news-important" type="checkbox"> Marcar como importante</label></div></div>
+          <div class="admin-form-actions"><button class="btn btn-dark" type="submit">Guardar novedad</button><button class="btn btn-light" type="button" data-admin-cancel="news-form">Cancelar</button><span class="admin-form-status" id="news-form-status"></span></div>
+        </form>
+        <div class="admin-list" id="admin-news-list"></div>
+      </div>
+
+      <div class="admin-view" id="admin-view-projects">
+        <div class="admin-toolbar"><div><h3>Proyectos</h3><p>Actualizá el avance de las obras y propuestas.</p></div><button class="btn btn-gold" type="button" id="admin-new-project">+ Nuevo proyecto</button></div>
+        <form class="admin-form hidden" id="project-form">
+          <input type="hidden" id="project-id">
+          <div class="admin-form-grid"><div><label for="project-title">Título</label><input id="project-title" maxlength="160" required></div><div><label for="project-state">Estado</label><select id="project-state"><option value="propuesto">Propuesto</option><option value="evaluacion">En evaluación</option><option value="aprobado">Aprobado</option><option value="ejecucion">En ejecución</option><option value="finalizado">Finalizado</option></select></div><div class="admin-form-wide"><label for="project-description">Descripción</label><textarea id="project-description" rows="4" maxlength="5000" required></textarea></div><div><label for="project-budget">Presupuesto</label><input id="project-budget" type="number" min="0" step="0.01"></div><div><label for="project-start">Fecha de inicio</label><input id="project-start" type="date"></div><div><label for="project-end">Fecha de finalización</label><input id="project-end" type="date"></div></div>
+          <div class="admin-form-actions"><button class="btn btn-dark" type="submit">Guardar proyecto</button><button class="btn btn-light" type="button" data-admin-cancel="project-form">Cancelar</button><span class="admin-form-status" id="project-form-status"></span></div>
+        </form>
+        <div class="admin-list" id="admin-project-list"></div>
+      </div>
+
+      <div class="admin-view" id="admin-view-suggestions">
+        <div class="admin-toolbar"><div><h3>Sugerencias y reclamos</h3><p>Revisá mensajes de vecinos y respondé desde acá.</p></div></div>
+        <div class="admin-list" id="admin-suggestions-list"></div>
+      </div>
+    </section>
+  </main>
+  <div class="project-modal hidden" id="project-modal" role="dialog" aria-modal="true" aria-labelledby="project-modal-title">
+    <div class="project-modal-backdrop" data-close-project></div>
+    <article class="project-modal-card">
+      <button class="project-modal-close" id="project-modal-close" type="button" aria-label="Cerrar proyecto">×</button>
+      <span class="tag project-tag" id="project-modal-tag">PROYECTO</span>
+      <h3 id="project-modal-title"></h3>
+      <p id="project-modal-description"></p>
+      <div class="project-details">
+        <div><span>Presupuesto</span><strong id="project-modal-budget"></strong></div>
+        <div><span>Fecha de inicio</span><strong id="project-modal-start"></strong></div>
+        <div><span>Fecha de finalización</span><strong id="project-modal-end"></strong></div>
+      </div>
+    </article>
+  </div>
+  <div class="news-modal hidden" id="news-modal" role="dialog" aria-modal="true" aria-labelledby="news-modal-title">
+    <div class="news-modal-backdrop" data-close-news></div>
+    <article class="news-modal-card">
+      <button class="news-modal-close" id="news-modal-close" type="button" aria-label="Cerrar novedad">×</button>
+      <span class="tag" id="news-modal-tag">NOVEDAD</span>
+      <h3 id="news-modal-title"></h3>
+      <time id="news-modal-date"></time>
+      <p id="news-modal-content"></p>
+    </article>
+  </div>
+  <div class="owner-modal hidden" id="owner-modal" role="dialog" aria-modal="true" aria-labelledby="owner-modal-title">
+    <div class="owner-modal-backdrop" data-close-owner></div>
+    <article class="owner-modal-card">
+      <button class="owner-modal-close" id="owner-modal-close" type="button" aria-label="Cerrar">×</button>
+      <span class="tag">NUEVO PROPIETARIO</span>
+      <h3 id="owner-modal-title">Crear propietario</h3>
+      <p class="owner-modal-help">Se creará el usuario de acceso y quedará asociado a la unidad seleccionada.</p>
+      <form id="owner-create-form" class="admin-form owner-create-form">
+        <div class="admin-form-grid">
+          <div>
+            <label for="owner-create-unit">Unidad</label>
+            <select id="owner-create-unit" required></select>
+          </div>
+          <div>
+            <label for="owner-create-first">Nombre</label>
+            <input id="owner-create-first" type="text" maxlength="80" required autocomplete="given-name">
+          </div>
+          <div>
+            <label for="owner-create-last">Apellido</label>
+            <input id="owner-create-last" type="text" maxlength="80" required autocomplete="family-name">
+          </div>
+          <div>
+            <label for="owner-create-email">Correo electrónico</label>
+            <input id="owner-create-email" type="email" maxlength="180" required autocomplete="email">
+          </div>
+          <div>
+            <label for="owner-create-password">Contraseña inicial</label>
+            <input id="owner-create-password" type="password" minlength="8" maxlength="72" required autocomplete="new-password">
+            <small class="form-help">Mínimo 8 caracteres. Entregásela al propietario para su primer acceso.</small>
+          </div>
+        </div>
+        <div class="admin-form-actions">
+          <button class="btn btn-dark" type="submit" id="owner-create-submit">Crear propietario</button>
+          <button class="btn btn-light" type="button" id="owner-create-cancel">Cancelar</button>
+          <span class="admin-form-status" id="owner-create-status"></span>
+        </div>
+      </form>
+    </article>
+  </div>
+  <footer class="footer"><div class="container footer-inner"><strong>ORO</strong><span>Portal de vecinos · 19 unidades</span><small>© <span id="year"></span> ORO</small></div></footer>
+</body>
+</html>
